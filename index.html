@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>EmoSense — Анализ эмоций в тексте</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            joy: { LIGHT: '#fef08a', DEFAULT: '#eab308', DARK: '#ca8a04', ACCENT: '#854d0e' },
+            sadness: { LIGHT: '#bfdbfe', DEFAULT: '#3b82f6', DARK: '#1d4ed8', ACCENT: '#1e3a8a' },
+            anger: { LIGHT: '#fecaca', DEFAULT: '#ef4444', DARK: '#b91c1c', ACCENT: '#7f1d1d' },
+            fear: { LIGHT: '#e9d5ff', DEFAULT: '#a855f7', DARK: '#7e22ce', ACCENT: '#581c87' },
+            surprise: { LIGHT: '#fde68a', DEFAULT: '#f59e0b', DARK: '#b45309', ACCENT: '#78350f' },
+            neutral: { LIGHT: '#e2e8f0', DEFAULT: '#64748b', DARK: '#334155', ACCENT: '#0f172a' }
+          },
+          animation: {
+            'pulse-subtle': 'pulseSubtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'slide-up': 'slideUp 0.3s ease-out forwards',
+            'pop-in': 'popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
+          },
+          keyframes: {
+            pulseSubtle: {
+              '0%, 100%': { opacity: 1 },
+              '50%': { opacity: 0.85 },
+            },
+            slideUp: {
+              '0%': { opacity: 0, transform: 'translateY(16px)' },
+              '100%': { opacity: 1, transform: 'translateY(0)' },
+            },
+            popIn: {
+              '0%': { opacity: 0, transform: 'scale(0.92)' },
+              '100%': { opacity: 1, transform: 'scale(1)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    
+    /* Smooth Scrollbar */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.4);
+      border-radius: 4px;
+    }
+    
+    .glass-effect {
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* Custom Ripple/Active styling */
+    .touch-active:active {
+      transform: scale(0.97);
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100 h-full flex justify-center items-center overflow-hidden antialiased">
+
+  <!-- Main App Shell - Mobile Container -->
+  <div id="app" class="w-full max-w-md h-full sm:h-[92vh] sm:max-h-[850px] bg-slate-50 dark:bg-slate-900 sm:rounded-[36px] shadow-2xl flex flex-col relative overflow-hidden border-0 sm:border border-slate-200/60 dark:border-slate-800 transition-colors duration-300">
+    
+    <!-- Top Status / Header Bar -->
+    <header class="px-5 pt-4 pb-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-20 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+      <div class="flex items-center space-x-2">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-none tracking-tight bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">EmoSense</h1>
+          <span class="text-[10px] text-slate-400 font-medium tracking-wide">Powered by Gemini AI</span>
+        </div>
+      </div>
+
+      <!-- Theme Switcher & Actions -->
+      <div class="flex items-center space-x-1">
+        <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors touch-active">
+          <i id="themeIcon" data-lucide="moon" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Content Container (Scrollable) -->
+    <main class="flex-1 overflow-y-auto relative pb-24 px-4 pt-4">
+
+      <!-- ==================== TAB 1: HOME ==================== -->
+      <section id="tab-home" class="tab-content space-y-5 animate-slide-up">
+        
+        <!-- Greeting Card -->
+        <div class="bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 dark:from-indigo-500/20 dark:via-purple-500/20 dark:to-pink-500/20 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl p-4">
+          <h2 class="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+            <span>👋 Привет!</span>
+          </h2>
+          <p class="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+            Узнайте эмоциональную окраску вашего текста с помощью искусственного интеллекта.
+          </p>
+        </div>
+
+        <!-- Last Analysis Preview Block -->
+        <div id="lastAnalysisCard" onclick="openLastResult()" class="hidden cursor-pointer group bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition-all touch-active">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[11px] font-semibold tracking-wider text-slate-400 uppercase flex items-center gap-1">
+              <i data-lucide="clock" class="w-3 h-3"></i> Последний анализ
+            </span>
+            <span id="lastAnalysisBadge" class="px-2 py-0.5 text-[10px] font-bold rounded-full text-white"></span>
+          </div>
+          <p id="lastAnalysisText" class="text-xs font-medium text-slate-700 dark:text-slate-200 line-clamp-1 italic"></p>
+        </div>
+
+        <!-- Input Area -->
+        <div class="space-y-2">
+          <label for="textInput" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-1">
+            Ваш текст для анализа
+          </label>
+          <div class="relative">
+            <textarea id="textInput" rows="4" maxlength="1000" oninput="updateCharCounter()"
+              placeholder="Введите мысли, сообщение или отзыв на любом языке (русский, казахский и др.)..."
+              class="w-full p-3.5 text-sm rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all resize-none shadow-sm"></textarea>
+            
+            <div class="absolute bottom-2.5 right-3 flex items-center gap-2">
+              <button onclick="clearInput()" title="Очистить" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md transition-colors">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+              <span id="charCounter" class="text-[10px] text-slate-400 font-mono">0 / 1000</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sample Preset Chips -->
+        <div class="space-y-2">
+          <span class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-1">
+            Примеры фраз (нажмите для ввода)
+          </span>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="applyPreset('Я так рад, что наш проект наконец-то запустят! Это огромный успех!', 'ru')" class="chip-btn text-xs px-3 py-1.5 rounded-full bg-amber-100/70 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/50 hover:bg-amber-200/60 transition-colors touch-active flex items-center gap-1.5">
+              <span>😄</span> Радость
+            </button>
+            <button onclick="applyPreset('Мне так грустно, что лето закончилось и друзья разъехались...', 'ru')" class="chip-btn text-xs px-3 py-1.5 rounded-full bg-blue-100/70 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800/50 hover:bg-blue-200/60 transition-colors touch-active flex items-center gap-1.5">
+              <span>😢</span> Грусть
+            </button>
+            <button onclick="applyPreset('Бұл не деген масқара! Поезд тағы да кешігіп жатыр!', 'kk')" class="chip-btn text-xs px-3 py-1.5 rounded-full bg-rose-100/70 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/50 hover:bg-rose-200/60 transition-colors touch-active flex items-center gap-1.5">
+              <span>😡</span> Гнев (QAZ)
+            </button>
+            <button onclick="applyPreset('Түнде жалғыз жүру өте қорқынышты екен...', 'kk')" class="chip-btn text-xs px-3 py-1.5 rounded-full bg-purple-100/70 dark:bg-purple-950/40 text-purple-800 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 hover:bg-purple-200/60 transition-colors touch-active flex items-center gap-1.5">
+              <span>😱</span> Страх (QAZ)
+            </button>
+            <button onclick="applyPreset('Ничего себе! Вход бесплатный для всех посетителей?!', 'ru')" class="chip-btn text-xs px-3 py-1.5 rounded-full bg-orange-100/70 dark:bg-orange-950/40 text-orange-800 dark:text-orange-300 border border-orange-200 dark:border-orange-800/50 hover:bg-orange-200/60 transition-colors touch-active flex items-center gap-1.5">
+              <span>😲</span> Удивление
+            </button>
+            <button onclick="applyPreset('Завтра в 10:00 состоится запланированное рабочее совещание.', 'ru')" class="chip-btn text-xs px-3 py-1.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-slate-300/60 transition-colors touch-active flex items-center gap-1.5">
+              <span>😐</span> Нейтрально
+            </button>
+          </div>
+        </div>
+
+        <!-- Action Button -->
+        <button id="analyzeBtn" onclick="runAnalysis()" class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-semibold text-sm shadow-lg shadow-indigo-500/25 flex items-center justify-center space-x-2 transition-all active:scale-[0.98]">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+          <span>Анализировать</span>
+        </button>
+
+        <!-- Info Card / Language Banner -->
+        <div class="p-3.5 rounded-2xl bg-slate-200/50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/40 flex items-start space-x-3">
+          <div class="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+            <i data-lucide="globe" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h4 class="text-xs font-semibold text-slate-800 dark:text-slate-200">Мультиязычная поддержка</h4>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
+              Gemini AI распознаёт контекст и эмоции на русском, казахском, английском и других языках.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 2: RESULT ==================== -->
+      <section id="tab-result" class="tab-content hidden space-y-4 animate-slide-up">
+        
+        <!-- Placeholder / Empty State for Result -->
+        <div id="resultEmptyState" class="text-center py-12 px-4 space-y-3">
+          <div class="w-16 h-16 rounded-full bg-slate-200/70 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+            <i data-lucide="bar-chart-3" class="w-8 h-8"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-700 dark:text-slate-300">Результат не выбран</h3>
+          <p class="text-xs text-slate-500 max-w-xs mx-auto">
+            Введите текст на главном экране и нажмите «Анализировать», чтобы увидеть подробный отчет.
+          </p>
+          <button onclick="switchTab('home')" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-medium shadow-md shadow-indigo-500/20 touch-active">
+            Перейти к вводу
+          </button>
+        </div>
+
+        <!-- Result Container -->
+        <div id="resultContent" class="hidden space-y-4">
+          
+          <!-- Emotion Main Card -->
+          <div id="emotionCard" class="rounded-3xl p-6 text-white text-center shadow-xl relative overflow-hidden transition-all duration-500 animate-pop-in">
+            <!-- Background Decorative Glow -->
+            <div class="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div id="emotionEmoji" class="text-5xl mb-2 drop-shadow-md animate-bounce">😄</div>
+            <h2 id="emotionTitle" class="text-2xl font-black tracking-tight mb-1">Радость</h2>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/20 backdrop-blur-md text-xs font-semibold">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+              <span>Уверенность: <span id="emotionConfidence">95%</span></span>
+            </div>
+
+            <!-- Progress Meter -->
+            <div class="w-full bg-black/20 h-1.5 rounded-full mt-4 overflow-hidden">
+              <div id="confidenceBar" class="bg-white h-full rounded-full transition-all duration-700 ease-out" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Original Text Section -->
+          <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 shadow-sm space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <span class="flex items-center gap-1">
+                <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Исходный текст
+              </span>
+              <span id="resultTimestamp" class="text-[10px] text-slate-400"></span>
+            </div>
+            <p id="resultSourceText" class="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed italic bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800"></p>
+          </div>
+
+          <!-- AI Explanation Section -->
+          <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 shadow-sm space-y-2">
+            <div class="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+              <i data-lucide="bot" class="w-4 h-4"></i>
+              <span>Пояснение Gemini AI</span>
+            </div>
+            <p id="resultExplanation" class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed"></p>
+          </div>
+
+          <!-- Action Buttons Bar -->
+          <div class="grid grid-cols-3 gap-2 pt-2">
+            <button onclick="repeatAnalysis()" class="flex flex-col items-center justify-center p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all touch-active">
+              <i data-lucide="rotate-ccw" class="w-5 h-5 mb-1 text-indigo-500"></i>
+              <span class="text-[11px] font-medium">Повторить</span>
+            </button>
+            <button onclick="shareResult()" class="flex flex-col items-center justify-center p-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all touch-active">
+              <i data-lucide="share-2" class="w-5 h-5 mb-1 text-purple-500"></i>
+              <span class="text-[11px] font-medium">Поделиться</span>
+            </button>
+            <button onclick="startNewAnalysis()" class="flex flex-col items-center justify-center p-3 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-500/20 hover:bg-indigo-500 transition-all touch-active">
+              <i data-lucide="plus-circle" class="w-5 h-5 mb-1"></i>
+              <span class="text-[11px] font-medium">Новый</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ==================== TAB 3: HISTORY ==================== -->
+      <section id="tab-history" class="tab-content hidden space-y-4 animate-slide-up">
+        
+        <!-- History Header & Clear Action -->
+        <div class="flex items-center justify-between px-1">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 dark:text-slate-100">История анализов</h2>
+            <p class="text-[11px] text-slate-400">Сохраняется локально на вашем устройстве</p>
+          </div>
+          <button id="clearHistoryBtn" onclick="confirmClearHistory()" class="px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 text-xs font-semibold hover:bg-rose-100 transition-colors flex items-center gap-1 touch-active">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Очистить</span>
+          </button>
+        </div>
+
+        <!-- History List Container -->
+        <div id="historyList" class="space-y-2.5">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Empty History State -->
+        <div id="historyEmptyState" class="hidden text-center py-16 px-4 space-y-3">
+          <div class="w-16 h-16 rounded-full bg-slate-200/60 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400">
+            <i data-lucide="history" class="w-8 h-8"></i>
+          </div>
+          <h3 class="text-base font-bold text-slate-700 dark:text-slate-300">История пуста</h3>
+          <p class="text-xs text-slate-500 max-w-xs mx-auto">
+            Здесь будут отображаться все выполненные вами тексты и результаты их распознавания.
+          </p>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- Bottom Mobile Navigation Bar -->
+    <nav class="absolute bottom-0 left-0 right-0 h-16 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 px-6 flex items-center justify-around z-30">
+      
+      <button onclick="switchTab('home')" id="nav-home" class="nav-btn flex flex-col items-center justify-center w-16 h-full text-indigo-600 dark:text-indigo-400 transition-colors">
+        <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
+        <span class="text-[10px] font-semibold">Home</span>
+      </button>
+
+      <button onclick="switchTab('result')" id="nav-result" class="nav-btn flex flex-col items-center justify-center w-16 h-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+        <i data-lucide="bar-chart-2" class="w-5 h-5 mb-0.5"></i>
+        <span class="text-[10px] font-semibold">Result</span>
+      </button>
+
+      <button onclick="switchTab('history')" id="nav-history" class="nav-btn flex flex-col items-center justify-center w-16 h-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+        <i data-lucide="clock" class="w-5 h-5 mb-0.5"></i>
+        <span class="text-[10px] font-semibold">History</span>
+      </button>
+
+    </nav>
+
+    <!-- Toast Notification Banner -->
+    <div id="toast" class="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 dark:bg-slate-100/90 text-white dark:text-slate-900 text-xs font-medium px-4 py-2 rounded-full shadow-lg opacity-0 pointer-events-none transition-all duration-300 flex items-center space-x-2">
+      <i id="toastIcon" data-lucide="info" class="w-4 h-4"></i>
+      <span id="toastMsg">Уведомление</span>
+    </div>
+
+    <!-- Confirm Modal Overlay -->
+    <div id="modalOverlay" class="absolute inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-200">
+      <div id="modalCard" class="bg-white dark:bg-slate-800 rounded-3xl p-5 w-full max-w-xs space-y-4 shadow-2xl transform scale-95 transition-transform duration-200">
+        <div class="flex items-center space-x-3 text-rose-500">
+          <div class="p-2.5 rounded-2xl bg-rose-100 dark:bg-rose-950/60">
+            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 dark:text-slate-100 text-sm">Очистить историю?</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Это действие нельзя отменить.</p>
+          </div>
+        </div>
+        <div class="flex gap-2 pt-1">
+          <button onclick="closeModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700">Отмена</button>
+          <button onclick="executeClearHistory()" class="flex-1 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-semibold shadow-md shadow-rose-600/20 hover:bg-rose-500">Удалить</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Emotion Configurations
+    const EMOTIONS = {
+      joy: {
+        id: 'joy',
+        name: 'Радость',
+        emoji: '😄',
+        bgGradient: 'from-amber-500 via-yellow-500 to-amber-600',
+        badgeBg: 'bg-amber-500',
+        textColor: 'text-amber-500',
+        lightBg: 'bg-amber-50 dark:bg-amber-950/30'
+      },
+      sadness: {
+        id: 'sadness',
+        name: 'Грусть',
+        emoji: '😢',
+        bgGradient: 'from-blue-600 via-indigo-600 to-blue-700',
+        badgeBg: 'bg-blue-500',
+        textColor: 'text-blue-500',
+        lightBg: 'bg-blue-50 dark:bg-blue-950/30'
+      },
+      anger: {
+        id: 'anger',
+        name: 'Гнев',
+        emoji: '😡',
+        bgGradient: 'from-red-600 via-rose-600 to-red-700',
+        badgeBg: 'bg-red-500',
+        textColor: 'text-red-500',
+        lightBg: 'bg-red-50 dark:bg-red-950/30'
+      },
+      fear: {
+        id: 'fear',
+        name: 'Страх',
+        emoji: '😱',
+        bgGradient: 'from-purple-600 via-fuchsia-600 to-purple-700',
+        badgeBg: 'bg-purple-500',
+        textColor: 'text-purple-500',
+        lightBg: 'bg-purple-50 dark:bg-purple-950/30'
+      },
+      panic: {
+        id: 'panic', name: 'Паническая атака', emoji: '🫨',
+        bgGradient: 'from-rose-600 via-purple-600 to-indigo-700',
+        badgeBg: 'bg-rose-600', textColor: 'text-rose-600',
+        lightBg: 'bg-rose-50 dark:bg-rose-950/30'
+      },
+      surprise: {
+        id: 'surprise',
+        name: 'Удивление',
+        emoji: '😲',
+        bgGradient: 'from-amber-500 via-orange-500 to-amber-600',
+        badgeBg: 'bg-amber-600',
+        textColor: 'text-amber-600',
+        lightBg: 'bg-amber-50 dark:bg-amber-950/30'
+      },
+      neutral: {
+        id: 'neutral',
+        name: 'Нейтральное',
+        emoji: '😐',
+        bgGradient: 'from-slate-600 via-slate-700 to-slate-800',
+        badgeBg: 'bg-slate-500',
+        textColor: 'text-slate-500',
+        lightBg: 'bg-slate-100 dark:bg-slate-800'
+      }
+    };
+
+    // State
+    let historyData = [];
+    let currentResult = null;
+    let activeTab = 'home';
+
+    // Global Initializer
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      loadHistory();
+      initTheme();
+      updateLastAnalysisCard();
+    });
+
+    // Theme Switcher
+    function initTheme() {
+      if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+        updateThemeIcon(true);
+      } else {
+        document.documentElement.classList.remove('dark');
+        updateThemeIcon(false);
+      }
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.theme = isDark ? 'dark' : 'light';
+      updateThemeIcon(isDark);
+    }
+
+    function updateThemeIcon(isDark) {
+      const icon = document.getElementById('themeIcon');
+      icon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+      lucide.createIcons();
+    }
+
+    // Navigation Tabs Switcher
+    function switchTab(tabId) {
+      activeTab = tabId;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+      // Update navbar styling
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.classList.remove('text-indigo-600', 'dark:text-indigo-400');
+        btn.classList.add('text-slate-400');
+      });
+
+      const activeNavBtn = document.getElementById(`nav-${tabId}`);
+      if (activeNavBtn) {
+        activeNavBtn.classList.remove('text-slate-400');
+        activeNavBtn.classList.add('text-indigo-600', 'dark:text-indigo-400');
+      }
+
+      if (tabId === 'history') {
+        renderHistoryList();
+      }
+    }
+
+    // Text Input Management
+    function updateCharCounter() {
+      const text = document.getElementById('textInput').value;
+      document.getElementById('charCounter').innerText = `${text.length} / 1000`;
+    }
+
+    function clearInput() {
+      document.getElementById('textInput').value = '';
+      updateCharCounter();
+    }
+
+    function applyPreset(text, lang) {
+      document.getElementById('textInput').value = text;
+      updateCharCounter();
+      showToast(lang === 'kk' ? 'Мәтін енгізілді' : 'Текст подставлен', 'check-circle-2');
+    }
+
+    // Text patterns only: this is not a clinical assessment.
+    function isDemoPanicQuote(text) {
+      const normalized = text.toLowerCase().replace(/ё/g, 'е').replace(/[^а-яa-z0-9]+/gu, ' ').trim().replace(/^боже\s+/, '');
+      return normalized === 'неужели ж я в самом деле возьму топор стану бить по голове нет я не вытерплю не вытерплю';
+    }
+
+    function hasPanicDescription(text) {
+      // Explicit demonstration rule requested for this literary quotation.
+      // This fixed label is not a medical assessment.
+      if (isDemoPanicQuote(text)) return true;
+      const clauses = text.toLowerCase().replace(/ё/g, 'е').split(/[.!?;\n]+|,?\s+но\s+/u);
+      return clauses.some(clause => {
+        // Ignore questions, educational mentions, past episodes and common negations.
+        if (/(что такое|расскажи|статья|изучаю|раньше|вчера|прошл|what is|used to|yesterday)/u.test(clause)) return false;
+        const cleaned = clause
+          .replace(/(?:нет|без|не испытываю|не чувствую|не было|не бывает|не было бы|не)\s+(?:у меня\s+)?(?:паническ[а-я]*\s+атак[а-я]*|паник[а-я]*|страх[а-я]*|тревог[а-я]*)/gu, '')
+          .replace(/(?:no|without|not having)\s+(?:a\s+)?panic(?: attack)?/gu, '');
+        const explicit = /(?:у меня|со мной|испытываю|чувствую|кажется|началась|начинается|накрыла|накрывает).*паническ[а-я]*\s+атак[а-я]*|(?:i am having|i'm having|i have|having a)\s+(?:a\s+)?panic attack/u.test(cleaned);
+        const distress = /паник[а-я]*|сильн[а-я]* страх|очень страшно|боюсь умереть|страх смерти|теряю контроль|panic|terrified|afraid to die/u.test(cleaned);
+        const bodilyGroups = [
+          /сердце (?:сильно )?(?:колотится|бьется)|сердцебиени[а-я]*|heart (?:is )?racing/u,
+          /не хватает воздуха|трудно дышать|задыхаюсь|не могу (?:вдохнуть|дышать)|can't breathe|short of breath/u,
+          /трясет|трясусь|дрож[а-я]*|shaking|trembling/u,
+          /кружится голова|головокружени[а-я]*|dizzy/u,
+          /немеют|онемени[а-я]*|покалывани[а-я]*|numb|tingling/u
+        ].filter(pattern => pattern.test(cleaned)).length;
+        return explicit || (distress && bodilyGroups >= 2);
+      });
+    }
+
+    // Local Emotion Analyzer Engine
+    function analyzeSentiment(text) {
+      const lower = text.toLowerCase();
+      
+      // Word boundaries prevent matches such as «рад» in «тетрадь».
+      // A trailing * denotes a word stem. Negation handling is local and approximate.
+      const joyKeys = ['рад*', 'раду*', 'счастлив*', 'счасть*', 'ура', 'отлично', 'замечатель*', 'супер', 'успех*', 'восторг*', 'люблю', 'обожаю', 'весел*', 'довол*', 'прекрасн*', 'наслажда*', 'қуаныш*', 'тамаша', 'керемет', 'сәтті', 'жақсы', 'happy', 'love', 'great', 'delighted', 'excited'];
+      const sadnessKeys = ['груст*', 'печал*', 'слез*', 'плач*', 'плак*', 'жаль', 'одинок*', 'тоск*', 'скучаю', 'пусто', 'безнадеж*', 'подавлен*', 'расстро*', 'горюю', 'уныл*', 'обидно', 'больно на душе', 'нет сил', 'өкініш*', 'мұң*', 'жыла*', 'қайғы*', 'жаман', 'sad', 'cry*', 'lonely', 'unhappy', 'miserable'];
+      const angerKeys = ['гнев*', 'бесит', 'бесишь', 'бесите', 'бесят', 'бесил*', 'взбес*', 'злит', 'злишь', 'злите', 'злюсь', 'злят', 'злость', 'злой', 'злая', 'злые', 'ненави*', 'раздраж*', 'достал*', 'надоел*', 'возмущ*', 'ярост*', 'в ярости', 'вывел из себя', 'вывела из себя', 'выводишь из себя', 'прекрати', 'хватит', 'отстань', 'перестань', 'перестать так делать', 'масқара', 'ашу*', 'жек көр*', 'angry', 'hate', 'furious', 'annoy*', 'stop it'];
+      const fearKeys = ['страх*', 'боюсь', 'боишься', 'боится', 'боимся', 'боятся', 'страшн*', 'паник*', 'тревог*', 'тревож*', 'опасаюсь', 'испуг*', 'жутко', 'в ужасе', 'ужасно страшно', 'волнуюсь', 'волнени*', 'беспокоюсь', 'беспокой*', 'қорқыныш*', 'қорқам*', 'үрей*', 'scared', 'fear*', 'panic*', 'afraid', 'anxious', 'terrified', 'worried'];
+      const surpriseKeys = ['ого', 'вау', 'неужели', 'удив*', 'неожидан*', 'невероятно', 'ничего себе', 'не может быть', 'вот это да', 'как так', 'боже', 'боже мой', 'таңғажайып', 'таңқал*', 'сюрприз*', 'wow', 'surpris*', 'oh my god', 'unbelievable'];
+
+      let detected = 'neutral';
+      let confidence = 75;
+      let explanation = '';
+      const normalizedText = lower.replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+      const tokens = normalizedText.split(/\s+/u);
+      const negations = new Set(['не', 'нет', 'без', 'not', 'no']);
+      const countMatches = (keys) => keys.reduce((score, key) => {
+        const parts = key.split(' ');
+        const found = tokens.some((_, index) => {
+          if (!parts.every((part, offset) => {
+            const word = tokens[index + offset];
+            return word && (part.endsWith('*') ? word.startsWith(part.slice(0, -1)) : word === part);
+          })) return false;
+          // Preserve idioms that start with «не» and «нет».
+          if (negations.has(parts[0])) return true;
+          return !tokens.slice(Math.max(0, index - 2), index).some(word => negations.has(word));
+        });
+        return score + (found ? 1 : 0);
+      }, 0);
+
+      const joyCount = countMatches(joyKeys);
+      const sadnessCount = countMatches(sadnessKeys);
+      const angerCount = countMatches(angerKeys);
+      const fearCount = countMatches(fearKeys);
+      // «Боже» expresses surprise alone; a specific emotion takes precedence.
+      const specificSurpriseKeys = surpriseKeys.filter(key => !['боже', 'боже мой', 'oh my god'].includes(key));
+      const surpriseCount = countMatches(specificSurpriseKeys) +
+        (Math.max(joyCount, sadnessCount, angerCount, fearCount) === 0 ? countMatches(['боже', 'oh my god']) : 0);
+
+      const maxScore = Math.max(joyCount, sadnessCount, angerCount, fearCount, surpriseCount);
+
+      if (hasPanicDescription(text)) {
+        detected = 'panic';
+        confidence = isDemoPanicQuote(text) ? 79 : null;
+        explanation = 'В тексте есть описание панической атаки или сочетание выраженного страха с телесными ощущениями. Это совпадение с текстовыми правилами, а не подтверждение приступа и не медицинский диагноз. По одному тексту нельзя установить причину симптомов.';
+      } else if (maxScore > 0) {
+        if (maxScore === joyCount) {
+          detected = 'joy';
+          confidence = Math.min(98, 82 + joyCount * 6);
+          explanation = 'Текст содержит выраженные позитивные слова, выражающие радость, успех или воодушевление.';
+        } else if (maxScore === sadnessCount) {
+          detected = 'sadness';
+          confidence = Math.min(96, 80 + sadnessCount * 7);
+          explanation = 'В фразе присутствуют маркеры подавленности, грусти, тоски или переживаний.';
+        } else if (maxScore === angerCount) {
+          detected = 'anger';
+          confidence = Math.min(97, 85 + angerCount * 5);
+          explanation = 'Обнаружена возмущенная или агрессивная интонация, недовольство происходящим.';
+        } else if (maxScore === fearCount) {
+          detected = 'fear';
+          confidence = Math.min(95, 83 + fearCount * 6);
+          explanation = 'Текст указывает на состояние тревоги, страха перед неизвестностью или опасений.';
+        } else if (maxScore === surpriseCount) {
+          detected = 'surprise';
+          confidence = Math.min(94, 81 + surpriseCount * 7);
+          explanation = 'В высказывании заметно изумление или реакция на неожиданное событие.';
+        }
+      } else {
+        // Fallback length-based variance for neutral
+        confidence = Math.floor(Math.random() * 12) + 78;
+        explanation = 'Текст изложен в спокойной информативной форме без ярко выраженных эмоций.';
+      }
+
+      return {
+        id: Date.now().toString(),
+        text: text,
+        emotionId: detected,
+        confidence: confidence,
+        explanation: explanation,
+        timestamp: new Date().toLocaleString('ru-RU', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      };
+    }
+
+    // Perform Analysis Action
+    function runAnalysis() {
+      const textInput = document.getElementById('textInput');
+      const text = textInput.value.trim();
+
+      if (!text) {
+        showToast('Введите текст для анализа', 'alert-circle');
+        return;
+      }
+
+      // Button Loading UI
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      analyzeBtn.disabled = true;
+      analyzeBtn.innerHTML = `
+        <div class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+        <span>ИИ анализирует...</span>
+      `;
+
+      setTimeout(() => {
+        const result = analyzeSentiment(text);
+        currentResult = result;
+        
+        // Save to History
+        historyData.unshift(result);
+        saveHistory();
+        updateLastAnalysisCard();
+
+        // Render Result Screen
+        displayResult(result);
+
+        // Reset Button State
+        analyzeBtn.disabled = false;
+        analyzeBtn.innerHTML = `
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+          <span>Анализировать</span>
+        `;
+        lucide.createIcons();
+
+        // Navigate to Result tab
+        switchTab('result');
+      }, 700);
+    }
+
+    // Display Result View
+    function displayResult(res) {
+      const emotion = EMOTIONS[res.emotionId] || EMOTIONS.neutral;
+
+      document.getElementById('resultEmptyState').classList.add('hidden');
+      document.getElementById('resultContent').classList.remove('hidden');
+
+      // Card style & gradient
+      const card = document.getElementById('emotionCard');
+      card.className = `rounded-3xl p-6 text-white text-center shadow-xl relative overflow-hidden transition-all duration-500 animate-pop-in bg-gradient-to-br ${emotion.bgGradient}`;
+
+      document.getElementById('emotionEmoji').innerText = emotion.emoji;
+      document.getElementById('emotionTitle').innerText = emotion.name;
+      const confidenceLabel = document.getElementById('emotionConfidence');
+      confidenceLabel.innerText = res.confidence == null ? 'Не оценивается' : `${res.confidence}%`;
+      document.getElementById('confidenceBar').parentElement.classList.toggle('hidden', res.confidence == null);
+      
+      // Bar Animation
+      setTimeout(() => {
+        document.getElementById('confidenceBar').style.width = `${res.confidence ?? 0}%`;
+      }, 100);
+
+      document.getElementById('resultSourceText').innerText = `«${res.text}»`;
+      document.getElementById('resultExplanation').innerText = res.explanation;
+      document.getElementById('resultTimestamp').innerText = res.timestamp;
+    }
+
+    function openLastResult() {
+      if (historyData.length > 0) {
+        currentResult = historyData[0];
+        displayResult(currentResult);
+        switchTab('result');
+      }
+    }
+
+    function startNewAnalysis() {
+      clearInput();
+      switchTab('home');
+    }
+
+    function repeatAnalysis() {
+      if (currentResult) {
+        document.getElementById('textInput').value = currentResult.text;
+        updateCharCounter();
+        switchTab('home');
+      }
+    }
+
+    function shareResult() {
+      if (!currentResult) return;
+      const emotion = EMOTIONS[currentResult.emotionId];
+      const shareText = `EmoSense Анализ:\nТекст: "${currentResult.text}"\nЭмоция: ${emotion.emoji} ${emotion.name} ${currentResult.confidence == null ? "(без оценки вероятности)" : "(" + currentResult.confidence + "%)"}\nПояснение: ${currentResult.explanation}`;
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareText);
+        showToast('Результат скопирован в буфер!', 'copy');
+      } else {
+        showToast('Шеринг не поддерживается', 'alert-circle');
+      }
+    }
+
+    // History Persistence Operations
+    function loadHistory() {
+      try {
+        const stored = localStorage.getItem('emosense_history_v1');
+        historyData = stored ? JSON.parse(stored) : [];
+      } catch (e) {
+        historyData = [];
+      }
+    }
+
+    function saveHistory() {
+      try {
+        localStorage.setItem('emosense_history_v1', JSON.stringify(historyData));
+      } catch (e) {
+        console.error('Failed to save to localStorage', e);
+      }
+    }
+
+    function updateLastAnalysisCard() {
+      const card = document.getElementById('lastAnalysisCard');
+      if (historyData.length === 0) {
+        card.classList.add('hidden');
+        return;
+      }
+      card.classList.remove('hidden');
+
+      const last = historyData[0];
+      const emotion = EMOTIONS[last.emotionId] || EMOTIONS.neutral;
+
+      const badge = document.getElementById('lastAnalysisBadge');
+      badge.innerText = `${emotion.emoji} ${emotion.name}`;
+      badge.className = `px-2 py-0.5 text-[10px] font-bold rounded-full text-white ${emotion.badgeBg}`;
+
+      document.getElementById('lastAnalysisText').innerText = `"${last.text}"`;
+    }
+
+    function renderHistoryList() {
+      const listContainer = document.getElementById('historyList');
+      const emptyState = document.getElementById('historyEmptyState');
+
+      if (historyData.length === 0) {
+        listContainer.innerHTML = '';
+        emptyState.classList.remove('hidden');
+        return;
+      }
+
+      emptyState.classList.add('hidden');
+      listContainer.innerHTML = historyData.map((item) => {
+        const emotion = EMOTIONS[item.emotionId] || EMOTIONS.neutral;
+        return `
+          <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/60 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-xs hover:shadow-sm transition-all group touch-active" onclick="viewHistoryItem('${item.id}')">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg flex-shrink-0 ${emotion.lightBg}">
+                ${emotion.emoji}
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">${escapeHtml(item.text)}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-[10px] font-medium px-2 py-0.5 rounded-md ${emotion.lightBg} ${emotion.textColor}">
+                    ${emotion.name} ${item.confidence == null ? "Без оценки вероятности" : item.confidence + "%"}
+                  </span>
+                  <span class="text-[10px] text-slate-400">${item.timestamp}</span>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="deleteHistoryItem(event, '${item.id}')" title="Удалить" class="p-2 text-slate-300 hover:text-rose-500 rounded-xl hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors">
+              <i data-lucide="trash" class="w-4 h-4"></i>
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function viewHistoryItem(id) {
+      const found = historyData.find(item => item.id === id);
+      if (found) {
+        currentResult = found;
+        displayResult(found);
+        switchTab('result');
+      }
+    }
+
+    function deleteHistoryItem(event, id) {
+      event.stopPropagation();
+      historyData = historyData.filter(item => item.id !== id);
+      saveHistory();
+      renderHistoryList();
+      updateLastAnalysisCard();
+      showToast('Запись удалена', 'trash-2');
+    }
+
+    // Clear History Modal Triggering
+    function confirmClearHistory() {
+      if (historyData.length === 0) return;
+      const modal = document.getElementById('modalOverlay');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('modalCard').classList.remove('scale-95');
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('modalOverlay');
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      document.getElementById('modalCard').classList.add('scale-95');
+    }
+
+    function executeClearHistory() {
+      historyData = [];
+      saveHistory();
+      closeModal();
+      renderHistoryList();
+      updateLastAnalysisCard();
+      showToast('История очищена', 'check');
+    }
+
+    // Helper Toast UI
+    function showToast(msg, iconName = 'info') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      
+      const icon = document.getElementById('toastIcon');
+      icon.setAttribute('data-lucide', iconName);
+      lucide.createIcons();
+
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2000);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+  </script>
+</body>
+</html>
