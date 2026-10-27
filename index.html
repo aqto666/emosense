@@ -156,7 +156,12 @@
             <i data-lucide="scan-text" class="w-4 h-4"></i>
             <span>Сканировать текст камерой</span>
           </button>
-          <p class="text-[10px] text-slate-400 pl-1">Наведите камеру на текст — распознавание будет идти автоматически.</p>
+          <input id="photoTextInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="recognizeTextFromPhoto(event)">
+          <button id="scanPhotoBtn" type="button" onclick="document.getElementById('photoTextInput').click()" class="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+            <i data-lucide="image-plus" class="w-4 h-4"></i>
+            <span>Распознать текст по фото</span>
+          </button>
+          <p class="text-[10px] text-slate-400 pl-1">Можно навести камеру в реальном времени или выбрать готовое фото из галереи.</p>
         </div>
 
         <!-- Sample Preset Chips -->
@@ -418,6 +423,50 @@
         status.textContent = error.message || 'Не удалось открыть камеру. Проверьте разрешение на использование камеры.';
         stopLiveTextScanner(true);
         showToast(status.textContent, 'alert-circle');
+      }
+    }
+
+    async function recognizeTextFromPhoto(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const button = document.getElementById('scanPhotoBtn');
+      const label = button.querySelector('span');
+      const originalLabel = label.textContent;
+      button.disabled = true;
+      label.textContent = 'Распознаю фото…';
+      try {
+        if (!window.Tesseract) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+            script.onload = resolve;
+            script.onerror = () => reject(new Error('Не удалось загрузить распознавание. Проверьте интернет.'));
+            document.head.appendChild(script);
+          });
+        }
+        const result = await Tesseract.recognize(file, 'rus+eng', {
+          logger: info => {
+            if (info.status === 'recognizing text' && info.progress) {
+              label.textContent = 'Распознаю… ' + Math.round(info.progress * 100) + '%';
+            }
+          }
+        });
+        const recognized = (result.data.text || '').replace(/\s+/g, ' ').trim();
+        if (!recognized) {
+          showToast('Не удалось найти текст на фото', 'alert-circle');
+          return;
+        }
+        const textarea = document.getElementById('textInput');
+        textarea.value = recognized.slice(0, 1000);
+        updateCharCounter();
+        textarea.focus();
+        showToast(recognized.length > 1000 ? 'Текст вставлен (первые 1000 символов)' : 'Текст с фото вставлен', 'check');
+      } catch (error) {
+        showToast(error.message || 'Не удалось распознать фото', 'alert-circle');
+      } finally {
+        button.disabled = false;
+        label.textContent = originalLabel;
+        event.target.value = '';
       }
     }
 
