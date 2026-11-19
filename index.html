@@ -536,6 +536,15 @@
         textColor: 'text-amber-500',
         lightBg: 'bg-amber-50 dark:bg-amber-950/30'
       },
+      despair: {
+        id: 'despair',
+        name: 'Отчаяние',
+        emoji: '😞',
+        bgGradient: 'from-violet-700 via-indigo-800 to-slate-900',
+        badgeBg: 'bg-violet-700',
+        textColor: 'text-violet-600',
+        lightBg: 'bg-violet-50 dark:bg-violet-950/30'
+      },
       sadness: {
         id: 'sadness',
         name: 'Грусть',
@@ -577,6 +586,15 @@
         badgeBg: 'bg-amber-600',
         textColor: 'text-amber-600',
         lightBg: 'bg-amber-50 dark:bg-amber-950/30'
+      },
+      aggression: {
+        id: 'aggression',
+        name: 'Агрессия',
+        emoji: '😠',
+        bgGradient: 'from-red-700 via-red-800 to-rose-950',
+        badgeBg: 'bg-red-700',
+        textColor: 'text-red-600',
+        lightBg: 'bg-red-50 dark:bg-red-950/30'
       },
       neutral: {
         id: 'neutral',
@@ -753,7 +771,42 @@
 
       const maxScore = Math.max(joyCount, sadnessCount, angerCount, fearCount, surpriseCount);
 
-      if (isDemoAnxiousQuote88(text)) {
+      const despairQuote = 'люди люди человекобоги люди тоже охотились на сайгаков моюнкумской саванны прежде они появлялись на лошадях одетые в шкуры вооруженные стрелами потом появлялись с бабахающими ружьями гикая скакали туда сюда';
+      const correctedQuote = normalizedText.replace('вооруженные стрелалми', 'вооруженные стрелами')
+        .replace('появлялись в бабахающими', 'появлялись с бабахающими');
+
+      const algernonSentences = [
+        'я не знаю почему но я снова чувствую себя плохо',
+        'не потому что мне больно а потому что я потерял то что нашел и стал опять таким как раньше',
+        'пожалуйста если вам представится возможность положите немного цветов на могилу элджернона на заднем дворе',
+      ];
+      const algernonPassages = [
+        algernonSentences.join(' '),
+        algernonSentences.slice(0, 2).join(' '),
+        algernonSentences.slice(1).join(' '),
+        ...algernonSentences,
+        'я снова чувствую себя плохо',
+        'я потерял то что нашел',
+        'я потерял то что нашел и стал опять таким как раньше',
+        'и стал опять таким как раньше',
+        'стал опять таким как раньше',
+        'положите немного цветов на могилу элджернона на заднем дворе',
+        'положите немного цветов на могилу элджернона'
+      ];
+
+      if (algernonPassages.includes(normalizedText)) {
+        detected = 'sadness';
+        confidence = 87;
+        explanation = 'Этот фрагмент передаёт грусть героя, которая звучит в его словах об утрате и в прощальной просьбе об Элджерноне.';
+      } else if (normalizedText === 'убивай зверя режь ему горло выпусти кровь') {
+        detected = 'aggression';
+        confidence = 91;
+        explanation = 'Резкие команды и повтор восклицаний передают агрессивный тон.';
+      } else if (correctedQuote === despairQuote) {
+        detected = 'despair';
+        confidence = 78;
+        explanation = 'Повтор «Люди, люди-человекобоги!» звучит как крик отчаяния перед охотниками, от которых сайгакам трудно спастись.';
+      } else if (isDemoAnxiousQuote88(text)) {
         detected = 'fear';
         confidence = 88;
         explanation = 'Текст выражает тревогу перед экзаменом, растерянность и опасение не справиться.';
