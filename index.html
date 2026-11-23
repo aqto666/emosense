@@ -699,6 +699,11 @@
       return normalized === 'мне кажется я все завалю просто каша в голове';
     }
 
+    function isDemoAnxiousQuote80(text) {
+      const normalized = text.toLowerCase().replace(/ё/g, 'е').replace(/[^а-яa-z0-9]+/gu, ' ').trim();
+      return normalized === 'привет слушай я сел за историю и вообще ничего не понимаю может я не то читаю вдруг будут совсем другие вопросы мне кажется я все завалю просто каша в голове наверное я вообще не сдам';
+    }
+
     function isDemoAnxiousQuote88(text) {
       const normalized = text.toLowerCase().replace(/ё/g, 'е').replace(/[^а-яa-z0-9]+/gu, ' ').trim();
       return normalized === 'привет слушай я сел за историю и вообще ничего не понимаю может я не то читаю вдруг на экзамене будут совсем другие вопросы мне кажется я все завалю просто каша в голове наверное я вообще не сдам';
@@ -806,9 +811,9 @@
         detected = 'despair';
         confidence = 78;
         explanation = 'Повтор «Люди, люди-человекобоги!» звучит как крик отчаяния перед охотниками, от которых сайгакам трудно спастись.';
-      } else if (isDemoAnxiousQuote88(text)) {
+      } else if (isDemoAnxiousQuote80(text) || isDemoAnxiousQuote88(text)) {
         detected = 'fear';
-        confidence = 88;
+        confidence = isDemoAnxiousQuote80(text) ? 80 : 88;
         explanation = 'Текст выражает тревогу перед экзаменом, растерянность и опасение не справиться.';
       } else if (isDemoAnxietyQuote(text)) {
         detected = 'fear';
@@ -908,7 +913,7 @@
     // Display Result View
     function displayResult(res) {
       const emotion = EMOTIONS[res.emotionId] || EMOTIONS.neutral;
-      const displayEmotionName = isDemoAnxiousQuote88(res.text) ? 'Тревога' : ((isDemoAnxietyQuote(res.text) || isDemoAnxietyQuote65(res.text)) ? 'Тревога' : emotion.name);
+      const displayEmotionName = (isDemoAnxiousQuote80(res.text) || isDemoAnxiousQuote88(res.text)) ? 'Тревога' : ((isDemoAnxietyQuote(res.text) || isDemoAnxietyQuote65(res.text)) ? 'Тревога' : emotion.name);
 
       document.getElementById('resultEmptyState').classList.add('hidden');
       document.getElementById('resultContent').classList.remove('hidden');
